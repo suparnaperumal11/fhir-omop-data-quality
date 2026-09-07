@@ -289,3 +289,75 @@ where it can be counted. The cost is a larger staging database, which is untrack
 `stg_resource_census` records a count of every `resourceType` seen per file, including the ~10 types
 we do not stage. Types we skip are therefore *counted and named*, not silently dropped — the same
 standard applied to rows applies to resource types.
+
+### Staging result (1,112 patients)
+
+1,371,624 resources seen; **715,127 staged (52.1%)** across 9 tables, reconciling exactly on every
+type. Staging DB 1.8 GB.
+
+| table | rows | | table | rows |
+|---|---|---|---|---|
+| stg_observation | 544,824 | | stg_medication | 17,178 |
+| stg_encounter | 60,015 | | stg_patient | 1,112 |
+| stg_medicationrequest | 50,887 | | stg_location | 815 |
+| stg_condition | 38,668 | | stg_organization / stg_practitioner | 814 / 814 |
+
+The 656,497 unstaged resources are out-of-scope *types* (Procedure 171,206; DiagnosticReport 121,121;
+Claim and ExplanationOfBenefit 110,902 each; and 13 more), each named and counted in
+`stg_resource_census`. They are not part of the mapping-loss figure — they were never in scope — and
+the report must not let a reader confuse "we did not attempt this" with "this was lost."
+
+---
+
+## Step 4 — OMOP CDM v5.4 DDL
+
+### Scope change: `death` added as a sixth table
+
+OMOP v5.4 has no `death_date` on `person` — death is its own table. But the brief's required
+plausibility checks ("no death before birth; no drug exposure or condition after death") need it, and
+the cohort has **112 deceased patients** to exercise them. Raised as a scope question rather than
+decided silently; approved. It adds a table but **no new FHIR resource** — the data comes from
+`Patient.deceasedDateTime`, already staged.
+
+`care_site` and `provider` are also created, as dimension tables. Without them the conditional-
+reference resolution (decision 4) produces `care_site_id` / `provider_id` integers pointing at
+nothing. They are dimensions, not additional clinical mappings.
+
+`location` is **not** created. Patient address is not mapped; `person.location_id` stays NULL.
+A documented exclusion, and it belongs in the loss report — geography is genuinely absent from the
+output and a researcher asking a question about place would find nothing.
+
+### Constraints: NOT NULL kept, PK/FK omitted — and why that matters for the checks
+
+OHDSI ships constraints as a separate post-load script. Here that separation is load-bearing:
+
+- **No PK/FK constraints.** If the database enforced uniqueness on `person_id`, check CON-02
+  ("primary key unique") could never fail — the insert would error first. The check would measure
+  nothing. Leaving them unenforced is what makes the conformance checks real tests rather than
+  restatements of the schema.
+- **NOT NULL kept**, because it is part of "correctly typed" and because it *forces the reject path*:
+  a row that cannot supply a required field cannot be inserted, so it must be routed to
+  `etl_rejects` with a reason.
+
+**Consequence for reading the results:** conformance checks on NOT NULL columns are expected to
+report 0 failures, and the interesting number is the matching reject count. Read alone, the
+conformance section will make the pipeline look cleaner than it is. The two must be read together,
+and the report says so.
+
+### Audit tables: three, not one
+
+`etl_rejects` (real loss), `etl_out_of_scope` (correctly routed elsewhere), `etl_expansion`
+(legitimate one-to-many). Separate tables rather than one table with a disposition flag, because
+collapsing rejects and out-of-scope would overstate the loss figure — and with a single table that
+mistake is one careless `count(*)` away. Two tables make conflating them an active choice.
+
+Reject reason codes are a short controlled vocabulary (`MISSING_REQUIRED_FIELD`,
+`UNRESOLVED_REFERENCE`, `NO_SOURCE_CODE`, `UNPARSEABLE_DATE`, `IMPLAUSIBLE_DATE`, `NO_TARGET_COLUMN`)
+so that "top reasons per domain" is a clean group-by.
+
+**Not a reject reason: failing to map a source code to an OMOP concept.** That row still loads, with
+`concept_id = 0` and `*_source_value` populated. It is bucket 2 — structured but not computable —
+and counting it as a reject would misrepresent both numbers.
+
+Vocabulary lives in `source_to_concept_map`, OMOP's own vehicle for hand-mapping, rather than in
+CASE statements scattered through the mapping SQL. One inspectable table, one row per decision.
