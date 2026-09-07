@@ -220,11 +220,72 @@ MedicationRequest `status`: completed 211, active 9. `intent`: all 220 `order`.
 
 ---
 
-### Open decisions carried into Step 5
+### Decisions taken (end of Step 1)
 
-1. Timezone: truncate raw (+05:30) or convert to America/New_York? Quantify the row-level disagreement.
-2. Observation `component[]`: expand blood-pressure panels into 2 measurement rows, or reject?
-3. `medicationReference`: resolve via contained `Medication`, or reject 20% of drug exposures?
-4. Conditional references (`Organization?identifier=...|`): resolve care_site/provider, or NULL + report?
-5. `drug_exposure_end_date` has no source field — derive, default, or reject?
-6. Survey + social-history Observations (359 rows): out of scope by design — record as excluded, not lost.
+All six resolved before any parser was written. Rationale recorded because these are the
+defensible-choice questions, not implementation details.
+
+**1. Timezone — convert to America/New_York, and quantify the shift.**
+The `+05:30` is an artifact of the generating laptop, not a property of the data. Truncating the raw
+string would bake a Kolkata calendar date into a Massachusetts cohort. We convert, and we report how
+many rows move by a day. *That count is itself a finding* — it is what happens when an ETL ignores
+timezone, measured rather than asserted.
+
+**2. Blood pressure — expand `component[]` into two measurement rows.**
+Systolic and diastolic are distinct LOINC concepts and OMOP models them as separate measurements.
+Rejecting blood pressure from a clinical dataset would be indefensible. *Consequence for Step 6:*
+one source row producing two target rows breaks the simple identity `source = mapped + rejected`.
+The reconciliation needs an explicit **row-multiplication** column, so an expansion is never mistaken
+for a duplicate and never silently inflates the mapped count.
+
+**3. `medicationReference` — resolve it.**
+Losing one drug exposure in five is the worst kind of loss: invisible in aggregate, biased in
+composition (Synthea uses the reference form for specific administration types, so the missing 20%
+are not a random sample). Resolving referenced resources is exactly the real-world ETL work this
+project should demonstrate.
+
+**4. Conditional references — resolve them.**
+Mechanism is known: split on `|`, match the token against `identifier[].value` in the
+`hospitalInformation` / `practitionerInformation` bundles. Harder path, but `care_site_id` and
+`provider_id` NULL across every visit would be a large and avoidable hole. Timeboxed: if it proves
+fiddly, fall back to NULL-and-report — but try first.
+
+**5. `drug_exposure_end_date` — derive, and label the derivation.**
+OMOP requires it; FHIR does not supply it. Rule: `end = start` for single administrations.
+README states plainly that **duration is not recoverable from this source**. An honest documented
+constraint, not a fudge.
+
+**6. Survey + social-history Observations — excluded by design, counted in a third bucket.**
+They belong in OMOP `observation`, which is out of scope. "Correctly routed elsewhere" is not the
+same as "lost"; collapsing them into the rejects would overstate the loss figure. They are counted
+separately from both mapped and rejected.
+
+### Sample size
+
+Regenerated at `-p 1000 -s 42` before staging. At 5 patients we had 11 inpatient encounters and 3
+allergies — not enough to exercise the mapping, and a scaling problem discovered after the SQL is
+written is far more expensive than one found now.
+
+---
+
+## Step 2 — Stage
+
+### Design decision: flatten to columns, but keep every array as JSON
+
+The language rule says Python only flattens; all transformation is SQL. The risk is that "flattening"
+quietly becomes "transforming" — the moment the parser writes `code.coding[0].code` to a column it
+has made a mapping decision (take the first of N) in Python, in a project whose entire purpose is
+counting decisions like that one.
+
+So staging keeps scalars as scalars **verbatim** (raw datetime strings with their original offset,
+untouched) and keeps every array or nested object as a **JSON column**. `code_json` holds the whole
+`coding[]` array, so SQL can see that it had length 1 — or length 2 — and record the choice.
+Each table also carries `resource_json`, the complete original resource, so nothing we failed to
+anticipate is unrecoverable.
+
+Consequence: no row and no field is lost at staging, and every extraction decision happens in SQL
+where it can be counted. The cost is a larger staging database, which is untracked anyway.
+
+`stg_resource_census` records a count of every `resourceType` seen per file, including the ~10 types
+we do not stage. Types we skip are therefore *counted and named*, not silently dropped — the same
+standard applied to rows applies to resource types.
