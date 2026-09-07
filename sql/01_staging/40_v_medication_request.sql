@@ -1,11 +1,16 @@
 -- v_medication_request - one typed row per FHIR MedicationRequest.
 --
--- TWO WAYS OF NAMING A DRUG. 80% of MedicationRequests carry the RxNorm code inline
--- in medicationCodeableConcept; the other 20% carry medicationReference pointing at a
--- separate Medication resource. Reading only the inline form would lose one drug
--- exposure in five, and lose them non-randomly - Synthea uses the reference form for
--- particular administration types, so the missing fifth would be a biased sample, not
--- a random one. That is the most dangerous kind of loss: invisible in aggregate.
+-- TWO WAYS OF NAMING A DRUG. 66.2% of MedicationRequests carry the RxNorm code inline
+-- in medicationCodeableConcept (33,709); the other 33.8% carry medicationReference
+-- pointing at a separate Medication resource (17,178). Reading only the inline form
+-- would lose a third of all drug exposures, and lose them non-randomly - Synthea uses
+-- the reference form for particular administration types, so the missing third would
+-- be a biased sample, not a random one. That is the most dangerous kind of loss:
+-- invisible in aggregate.
+--
+-- (The 5-patient sample in Step 1 suggested 20%. The real figure at 1,112 patients is
+-- 33.8% - a reminder that a small sample sizes the problem badly even when it
+-- correctly identifies it.)
 --
 -- COALESCE below tries the inline code first and falls back to the resolved reference.
 -- medication_source is carried through so the loss report can show the split.
