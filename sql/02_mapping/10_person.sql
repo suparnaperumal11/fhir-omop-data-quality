@@ -24,6 +24,11 @@
 -- its own quality checks are meant to find makes those checks pass by construction.
 -- Only STRUCTURAL failures (cannot supply a NOT NULL column) become rejects.
 
+-- Idempotent: re-running replaces this file's output rather than doubling it.
+DELETE FROM person;
+DELETE FROM death;
+DELETE FROM etl_rejects WHERE target_table = 'person';
+
 -- ---------------------------------------------------------------------------
 -- Surrogate keys.
 --
