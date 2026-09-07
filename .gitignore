@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project: Synthea output and generated data are never committed
+data/
+.venv/
+output/
+outputs/
+*.jar
