@@ -361,3 +361,59 @@ and counting it as a reject would misrepresent both numbers.
 
 Vocabulary lives in `source_to_concept_map`, OMOP's own vehicle for hand-mapping, rather than in
 CASE statements scattered through the mapping SQL. One inspectable table, one row per decision.
+
+---
+
+## Step 7 — Checks and loss analysis
+
+**28 of 33 checks pass.** Three failures were predicted; two were not, and the two unexpected ones
+matter more than the twenty-eight passes.
+
+### PLA-10 — 1,175 events before birth. My bug, not Synthea's.
+
+Every one is *exactly* one day out — an arithmetic signature, not a clinical anomaly. Cause:
+event timestamps are converted `+05:30 -> America/New_York`, but `Patient.birthDate` is **date-only**
+with no time and no offset, so it cannot be converted and does not move. An event at 02:00 IST on the
+day of birth becomes 15:30 the previous day in New York.
+
+Proved by comparison: naive truncation gives **0** events before birth; conversion gives 1,071 from
+observations alone.
+
+This is not an argument for truncation — that would bake a Kolkata date into a Massachusetts cohort
+and affect 42% of rows rather than 0.18%. It is a demonstration that **you cannot consistently
+timezone-convert a dataset mixing timezone-bearing datetimes with timezone-less dates.** A proper fix
+needs a birth *time* the source does not carry.
+
+**Left unfixed on purpose.** Clamping event dates to the birth date would erase the evidence and make
+the check pass while the underlying incoherence remained. Reported instead.
+
+### PLA-06 — 102 visits after death. Synthea's bug, not mine.
+
+Spread over 1–14 days across 102 of the 112 deceased patients. Not concentrated at ±1 day, so not a
+timezone boundary effect. Synthea emits encounters dated after the death it recorded. Carried through
+rather than filtered — an ETL that drops the rows its own checks look for makes those checks pass by
+construction.
+
+### What surprised me
+
+- **Conformance passing 11/11 is weaker evidence than it looks.** `NOT NULL` in the DDL means a row
+  that could not supply a required field was diverted to `etl_rejects`, never admitted. Conformance
+  measures what got in. It has to be read against the reject count — zero here, across 695,506 rows.
+- **Zero rejects is a fact about Synthea, not about the pipeline.** Real EHR data would not do this.
+- **CON-08 passes only because of the timezone conversion.** Naive truncation would fail it on ~42%.
+- **The Q-03 query had a cartesian blow-up** — joining the fact table to a view keyed on code
+  multiplied every row by the number of rows sharing that code, reporting 63 million rows in a
+  38,668-row domain. Caught because the number was obviously impossible. Aggregate-then-join fixed it.
+  A less absurd magnitude would have shipped unnoticed.
+- **9.35% computable.** Everything loaded, nothing rejected, every conformance check green — and less
+  than a tenth of it answerable by concept query.
+
+### Rejected approaches
+
+- **Inventing concept_ids for the top-50 codes per domain.** Would have produced ~90% coverage and a
+  dataset that answers research questions wrongly. A wrong `concept_id` does not announce itself.
+- **Relaxing CMP-04/05/06** once the vocabulary decision made them unmeetable. The thresholds predate
+  the results and stay where they were set.
+- **Pre-filtering implausible rows during mapping.** Would have made PLA-02..PLA-06 pass by
+  construction.
+- **Folding out-of-scope Observations into rejects.** Would have overstated loss by ~59,000 rows.
