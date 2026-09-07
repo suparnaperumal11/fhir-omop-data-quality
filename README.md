@@ -61,6 +61,10 @@ SNOMED code never became an OMOP concept.
 
 A row count would call this pipeline a complete success. That gap is the finding.
 
+> **Every coverage figure in this repository is an optimistic upper bound.** Synthea's output is
+> tidier than real EHR data in ways that flatter all of them — one code system per domain, no local
+> codes, no ambiguous diagnoses, zero structural rejects. Section 7 quantifies how.
+
 Full detail: [outputs/mapping_loss_analysis.md](outputs/mapping_loss_analysis.md) and
 [outputs/quality_report.md](outputs/quality_report.md).
 
@@ -120,6 +124,37 @@ a quality framework becomes decoration.
   through rather than filtering — an ETL that drops the rows its own checks look for makes those
   checks pass by construction.
 
+### How much should you trust these numbers?
+
+Less than the decimal places suggest, and here is the specific reason.
+
+The first version of quantification Q-03 (top unmapped codes) reported **63,457,156 rows** for a
+single SNOMED code in a domain containing 38,668 rows in total. The cause was a cartesian blow-up: I
+joined the fact table to a view keyed on `code` to fetch display names, so every row was multiplied by
+the number of source rows sharing its code. The fix was to aggregate before joining.
+
+**I caught it only because the magnitude was absurd.** Sixty-three million in a thirty-eight-thousand
+row table announces itself. A join that inflated a count by 3%, or 15%, would have looked entirely
+plausible and shipped without comment.
+
+That is the honest confidence interval on this document: the figures that are *structurally*
+constrained are trustworthy, because they are cross-checked against each other and against a
+reconciliation identity that must balance —
+
+```
+source = mapped + rejected + out_of_scope
+target = mapped + expansion
+```
+
+— and it holds exactly, with zero residual, in all five domains. The 42% timezone figure is similarly
+corroborated: it matches the 10.5/24 = 43.75% predicted from the offset arithmetic, so two independent
+routes agree. Systolic and diastolic counts (15,672 each) cross-check against the 15,676 expansion
+rows.
+
+The figures with *no* independent cross-check — the Q-03 rankings, the per-domain code counts — rest
+on a single query each and have exactly the reliability of that query. I would not quote them to three
+significant figures without re-deriving them another way first.
+
 ## 6. What was lost in mapping
 
 ### Three buckets, never collapsed
@@ -147,7 +182,7 @@ recoverable from this source**: FHIR supplies no end date, so `drug_exposure_end
 `end = start`. A 90-day prescription and a single dose are indistinguishable in the output. Any
 duration analysis on this dataset is invalid.
 
-20% of requests name their drug via `medicationReference` rather than inline. Reading only the inline
+33.8% of requests name their drug via `medicationReference` rather than inline. Reading only the inline
 form would have lost 17,178 exposures — and lost them non-randomly, since Synthea uses the reference
 form for particular administration types. Invisible in aggregate, biased in composition.
 
@@ -259,4 +294,12 @@ NOTES.md        working log: decisions, rejections, surprises
 
 ---
 
-*Built with AI assistance; all design decisions, evaluation criteria and analysis are mine.*
+*Built with AI assistance. The judgment calls are mine: I set the 33 check thresholds in
+`eval/quality_checks.md` before any mapping code existed and refused to relax CMP-04/05/06 when the
+vocabulary decision made them unmeetable; I chose to map only attested concepts rather than invent
+plausible `concept_id`s, which is what produces the 9.35% headline; and I made the six mapping
+decisions recorded in [NOTES.md](NOTES.md) — timezone conversion over truncation, expanding blood
+pressure components, resolving `medicationReference` and conditional references rather than
+NULL-and-report, deriving `drug_exposure_end_date` with the limitation stated, and counting
+out-of-scope Observations separately from rejects. The interpretation of what those choices cost is
+mine too.*

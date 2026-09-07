@@ -191,6 +191,12 @@ mapping that reads only `medicationCodeableConcept` loses **one drug exposure in
 them non-randomly, since Synthea uses the reference form for specific administration types.
 Must resolve `medicationReference` → `Medication.code` (RxNorm).
 
+> **Corrected at 1,112 patients: the real figure is 33.8%, not 20%** (33,709 inline vs 17,178 by
+> reference). The 5-patient sample identified the problem correctly but sized it at roughly half its
+> actual magnitude. Worth remembering when reading any other percentage in this Step 1 section — they
+> are all drawn from six patients and should be treated as directional, not quantitative. The
+> downstream figures in Steps 5–7 come from the full cohort.
+
 ### What's optional (field presence across 6 patients)
 
 Patient always has: `address`, `birthDate`, `communication`, `extension`, `gender`, `identifier`,
@@ -239,7 +245,7 @@ The reconciliation needs an explicit **row-multiplication** column, so an expans
 for a duplicate and never silently inflates the mapped count.
 
 **3. `medicationReference` — resolve it.**
-Losing one drug exposure in five is the worst kind of loss: invisible in aggregate, biased in
+Losing one drug exposure in five — later measured at **one in three** — is the worst kind of loss: invisible in aggregate, biased in
 composition (Synthea uses the reference form for specific administration types, so the missing 20%
 are not a random sample). Resolving referenced resources is exactly the real-world ETL work this
 project should demonstrate.
