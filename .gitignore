@@ -217,9 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Project: Synthea output and generated data are never committed
+# Project: Synthea output and generated data are never committed.
+# outputs/ is deliberately NOT ignored — it holds tracked project deliverables.
 data/
 .venv/
 output/
-outputs/
 *.jar
