@@ -274,7 +274,8 @@ patients and re-rolls slots where a patient died, writing both records. Never re
 against the `-p` argument.
 
 `output/` (Synthea, ~5 GB) and `data/` (DuckDB, 1.8 GB) are gitignored. `outputs/` holds the
-deliverables and is tracked.
+deliverables and is tracked. For a two-minute read aimed at a research analyst deciding whether
+to use this dataset, see [outputs/dataset-fitness-report.md](outputs/dataset-fitness-report.md).
 
 ### Layout
 
