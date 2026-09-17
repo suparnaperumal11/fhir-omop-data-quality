@@ -19,9 +19,9 @@ analysis, run against the loaded database.
 loaded data is answerable by a standard concept-based query.**
 
 Structural success and research fitness are different questions, and this dataset answers them
-differently. A row count alone would call the mapping a complete success. A researcher running a
-standard cohort query against condition, drug, or measurement data will get back far less than
-"9.35%" suggests is missing — for those three domains specifically, the figure is closer to zero.
+differently. A row count alone would call the mapping a complete success. The 9.35% is
+concentrated almost entirely in visits and demographics. For conditions, drugs and measurements,
+the figure is zero.
 
 28 of 33 checks passed. Two failures were not predicted in advance and matter more than the count
 implies (§3, §6).
@@ -86,16 +86,18 @@ rows that carry a real, queryable `concept_id` are:
   source and nowhere in this OMOP instance.
 - **A cohort filtered on current condition status (active vs. resolved) cannot use a standard
   field** — it exists only as text in `condition_status_source_value`.
-- Blood pressure is a partial exception worth naming precisely: systolic and diastolic values
-  **are present as separate rows** (15,672 each) rather than silently dropped, because the
-  `component[]` array was explicitly expanded. But they carry `concept_id = 0` like the rest of
-  `measurement` — retrievable only by matching the raw LOINC `source_value`, not by a standard
-  concept-based query.
-- Two data-quality issues to be aware of before trusting date-based results: **1,175 of 651,010
-  clinical events (0.18%) are timestamped one day before the patient's recorded birth** — a
-  pipeline arithmetic artifact, not a clinical fact (§6) — and **102 of 11,933 visits (0.86%)
-  start after the patient's recorded death date**, which is a genuine defect in the source data,
-  carried through rather than filtered out.
+
+**Partial exception — blood pressure.** Unlike the rest of `measurement`, systolic and diastolic
+values are present as separate rows (15,672 each), not silently dropped: the `component[]` array
+was explicitly expanded rather than skipped. The row is there and correctly split — it just
+carries `concept_id = 0` like the rest of the domain, so it's retrievable by matching the raw
+LOINC `source_value`, not by a standard concept-based query.
+
+Two data-quality issues to be aware of before trusting date-based results: **1,175 of 651,010
+clinical events (0.18%) are timestamped one day before the patient's recorded birth** — a
+pipeline arithmetic artifact, not a clinical fact (§6) — and **102 of 11,933 visits (0.86%) start
+after the patient's recorded death date**, which is a genuine defect in the source data, carried
+through rather than filtered out.
 
 ## 6. Limitations
 
