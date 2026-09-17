@@ -48,7 +48,6 @@ def main():
         FROM v_dq_report""")
     h = one(con, "SELECT * FROM loss_headline")
 
-    # ---------------------------------------------------------------- report
     qr = f"""# Quality report
 
 Generated from `data/fhir_omop.duckdb`. Every figure is read from a table produced by
@@ -181,7 +180,6 @@ granularity, which is absent here. On real US Core data the collapse to OMOP's f
 Race concepts would be substantially lossier.
 """
 
-    # ------------------------------------------------------------ loss report
     la = f"""# Mapping loss analysis
 
 **What proportion of clinical data survives the mapping, and what exactly is lost?**
