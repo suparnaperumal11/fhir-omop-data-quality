@@ -123,7 +123,7 @@ check evaluating zero rows reports `NOT_EVALUATED`, never `PASS` — an empty ta
 quality check by vacuous truth.
 
 **The thresholds were committed before any mapping SQL existed** ([eval/quality_checks.md](eval/quality_checks.md),
-commit `f334550`, which precedes the first `sql/02_mapping/` commit). The ordering is deliberate: it
+commit `8737eb8`, which precedes the first `sql/02_mapping/` commit). The ordering is deliberate: it
 proves the standard was set before the results were seen.
 
 Three completeness checks now fail at 100%: **CMP-04** (`condition_occurrence` rows with a non-zero
