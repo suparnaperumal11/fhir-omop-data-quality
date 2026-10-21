@@ -65,6 +65,10 @@ A row count would call this pipeline a complete success. That gap is the finding
 > tidier than real EHR data in ways that flatter all of them — one code system per domain, no local
 > codes, no ambiguous diagnoses, zero structural rejects. Section 7 quantifies how.
 
+**If you only read one thing:** [Dataset fitness report](outputs/dataset-fitness-report.md) —
+what this dataset can and cannot answer, written for the analyst who has to decide whether to
+use it.
+
 Full detail: [outputs/mapping_loss_analysis.md](outputs/mapping_loss_analysis.md) and
 [outputs/quality_report.md](outputs/quality_report.md).
 
