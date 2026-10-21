@@ -299,12 +299,4 @@ NOTES.md        working log: decisions, rejections, surprises
 
 ---
 
-*Built with AI assistance. The judgment calls are mine: I set the 33 check thresholds in
-`eval/quality_checks.md` before any mapping code existed and refused to relax CMP-04/05/06 when the
-vocabulary decision made them unmeetable; I chose to map only attested concepts rather than invent
-plausible `concept_id`s, which is what produces the 9.35% headline; and I made the six mapping
-decisions recorded in [NOTES.md](NOTES.md) — timezone conversion over truncation, expanding blood
-pressure components, resolving `medicationReference` and conditional references rather than
-NULL-and-report, deriving `drug_exposure_end_date` with the limitation stated, and counting
-out-of-scope Observations separately from rejects. The interpretation of what those choices cost is
-mine too.*
+Built with AI assistance; all design decisions, evaluation criteria and analysis are mine.

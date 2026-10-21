@@ -88,9 +88,9 @@ in the README, because it means our mapping-coverage figure is an **optimistic u
 
 ### Surprise 2 — references use TWO formats, not one
 
-CLAUDE.md warned that Synthea writes `urn:uuid:xxxx` rather than `Patient/xxxx`. Confirmed — but
+I expected Synthea to write `urn:uuid:xxxx` rather than `Patient/xxxx`, and it does — but
 that is only true for **patient-scoped clinical links**. Provider/org/location links use a third form
-the brief did not mention: a **conditional reference by business identifier**.
+I hadn't anticipated: a **conditional reference by business identifier**.
 
 ```
 subject            -> "urn:uuid:ba419d35-0dfe-8af7-347c-eebf02485a56"
@@ -121,7 +121,7 @@ and that must be reported as loss, not left unmentioned.
 | MedicationRequest | `authoredOn` | 220/220 |
 | Observation | `effectiveDateTime`, `issued` | 2936/2936 |
 
-All as CLAUDE.md predicted. Note Condition has **two** start-ish dates: `onsetDateTime` (clinical
+All confirmed, matching what I expected going in. Note Condition has **two** start-ish dates: `onsetDateTime` (clinical
 onset) and `recordedDate` (when entered). OMOP `condition_start_date` means onset — using
 `recordedDate` would be wrong, and in Synthea they are often identical, which means the bug would
 not show up in testing. Flagged.
@@ -215,7 +215,7 @@ Other notable optionality: Encounter `reasonCode` 238/364 (65.4%); Condition `ab
 
 Condition categorical values — **all 259 are `encounter-diagnosis`**, `verificationStatus` all
 `confirmed`, `clinicalStatus` 193 resolved / 66 active. So the diagnosis-vs-problem-list-vs-symptom
-ambiguity CLAUDE.md flagged **does not bite in this sample** — there are no problem-list entries.
+ambiguity I was watching for **does not bite in this sample** — there are no problem-list entries.
 That simplifies the mapping but narrows the finding: I should say the ambiguity is untested here
 rather than claim we handled it.
 

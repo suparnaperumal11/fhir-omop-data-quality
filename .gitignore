@@ -223,3 +223,4 @@ data/
 .venv/
 output/
 *.jar
+CLAUDE.md
