@@ -39,6 +39,17 @@ Synthea (1,112 patients)
                        └── SQL: 33 quality checks + loss analysis
 ```
 
+**How those totals relate.** The bundles hold 1,371,624 resources of every type Synthea emits; 715,127
+of them belong to the nine resource types this pipeline reads at all, and are staged. Of those, 695,506
+are the five clinical types that have an OMOP destination — the other 19,621 are reference data
+(Practitioner, Organization, Location, and the Medication resources needed to resolve
+`medicationReference`). Subtracting the 59,060 survey and social-history Observations that belong in
+OMOP `observation` and are out of scope leaves 636,446 mapped source rows; blood-pressure components
+expand into 15,676 extra measurement rows, giving the **652,122** rows loaded with none rejected. The
+754,521 figure is not a row count at all — it counts individual datetime *fields* across the staged
+clinical resources, which is why it exceeds every row total above (an Encounter contributes both a
+start and an end).
+
 Python is used **only** to flatten FHIR JSON into staging tables. Every transformation from staging
 onward is SQL.
 
@@ -53,7 +64,8 @@ onward is SQL.
 
 ### The headline figure
 
-**652,122 rows loaded. Zero rejected. 9.35% are actually usable in a concept-based query.**
+**652,122 rows loaded. Zero rejected. 60,986 of 652,122 (9.35%) are actually usable in a
+concept-based query.**
 
 Every row reconciles. Every conformance check passes. And a researcher asking *"find me the patients
 with viral sinusitis"* gets nothing back — not because the patients don't have it, but because the
@@ -114,9 +126,12 @@ quality check by vacuous truth.
 commit `f334550`, which precedes the first `sql/02_mapping/` commit). The ordering is deliberate: it
 proves the standard was set before the results were seen.
 
-Three checks — CMP-04, CMP-05, CMP-06 — now fail at 100%. They were **not relaxed** when the
-vocabulary decision was taken. Lowering a threshold because you already know you will miss it is how
-a quality framework becomes decoration.
+Three completeness checks now fail at 100%: **CMP-04** (`condition_occurrence` rows with a non-zero
+`condition_concept_id`), **CMP-05** (`drug_exposure` rows with a non-zero `drug_concept_id`) and
+**CMP-06** (`measurement` rows with a non-zero `measurement_concept_id`). Each asks whether a clinical
+code resolved to a real OMOP concept, and without the vocabulary none can. They were **not relaxed**
+when the vocabulary decision was taken. Lowering a threshold because you already know you will miss
+it is how a quality framework becomes decoration.
 
 **Result: 28 pass, 5 fail.** Three failures were predicted. Two were not:
 
@@ -208,13 +223,13 @@ claim about a person's race.
 ### Timezone — the loss nobody looks for
 
 Every Synthea timestamp carries the offset of the **machine that generated it** (`+05:30`,
-Asia/Kolkata) rather than the patients' Massachusetts local time. Four records carry `+06:30` —
+Asia/Kolkata) rather than the patients' own **US Eastern** local time. Four records carry `+06:30` —
 India observed UTC+6:30 during 1942–45, and the oldest patient was born in 1925.
 
-**318,286 of 754,521 clinical dates (42.18%) fall on a different calendar day** depending on whether
-you convert the timezone or truncate the string. The pipeline converts. The magnitude is not
-arbitrary: New York is 10.5 hours behind IST, and events spread evenly across a day put 10.5/24 =
-43.75% before the boundary.
+**318,286 of 754,521 clinical date fields (42.18%) fall on a different calendar day** depending on
+whether you convert the timezone or truncate the string. The pipeline converts. The magnitude is not
+arbitrary: US Eastern is 10.5 hours behind IST on standard time, and events spread evenly across a day
+put 10.5/24 = 43.75% before the boundary.
 
 ## 7. What would be needed for real use
 
@@ -273,9 +288,21 @@ python src/ingest/run_sql.py sql/00_ddl sql/01_staging sql/02_mapping sql/03_qua
 python src/ingest/export_outputs.py
 ```
 
-**Seed: 42.** `-p 1000` produces **1,112** patients, not 1,000 — Synthea's `-p` counts *living*
+**Seed: 42.** `-p 1000` produces **1,112** patients here, not 1,000 — Synthea's `-p` counts *living*
 patients and re-rolls slots where a patient died, writing both records. Never reconcile row counts
 against the `-p` argument.
+
+**The 1,112 is a property of this run, not of the command.** `-p 1000` reliably fixes the *living*
+population at exactly 1,000; the deceased tail does not reproduce, because Synthea simulates up to the
+date you run it and the mortality outcome of a given seeded patient therefore changes with the calendar.
+The same `-p 1000 -s 42` on the jar currently in this repo returns 1,164 (1,000 living + 164 deceased);
+forcing the reference date back to the 2026-09-07 run date returns 1,109. The sibling
+[medication-alert-burden](https://github.com/suparnaperumal11/medication-alert-burden) repository quotes
+1,127 for the same seed. Its cohort was generated the same day as this one, so the run date does not
+account for that particular gap; the likeliest remaining cause is a different Synthea build, since the
+jar now in this repo reproduces neither figure. Two things were tested directly and are *not* the
+cause: the export format (`FHIR` or `CSV`) and the `-cs` clinician seed both leave the population
+identical. Treat the living count as reproducible and the total as a snapshot.
 
 `output/` (Synthea, ~5 GB) and `data/` (DuckDB, 1.8 GB) are gitignored. `outputs/` holds the
 deliverables and is tracked. For a two-minute read aimed at a research analyst deciding whether
